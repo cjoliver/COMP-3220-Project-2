@@ -181,6 +181,7 @@ public class AddTransaction extends JFrame {
             switch (adapter.saveProduct(ModelT)) {
                 case SQLiteDataAccess.PRODUCT_DUPLICATE_ERROR:
                     JOptionPane.showMessageDialog(null, "Transaction NOT added successfully! Duplicate product ID!");
+                    break;
                 default:
 
                     addRow(temp);

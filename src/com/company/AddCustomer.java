@@ -109,6 +109,7 @@ public class AddCustomer extends JFrame {
             switch (adapter.saveProduct(customer)) {
                 case SQLiteDataAccess.PRODUCT_DUPLICATE_ERROR:
                     JOptionPane.showMessageDialog(null, "customer NOT added successfully! Duplicate product ID!");
+                    break;
                 default:
                     Object[] temp = {customer.mCustomerID, customer.mName, customer.mEmail, customer.mPhone};
                     addRow(temp);

@@ -133,6 +133,7 @@ public class AddProduct extends JFrame {
             switch (adapter.saveProduct(product)) {
                 case SQLiteDataAccess.PRODUCT_DUPLICATE_ERROR:
                     JOptionPane.showMessageDialog(null, "Product NOT added successfully! Duplicate product ID!");
+                    break;
                 default:
                     Object[] temp = {product.mProductID, product.mName, product.mPrice, product.mQuantity, product.mTax};
                     addRow(temp);
