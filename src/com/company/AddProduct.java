@@ -1,14 +1,25 @@
 package com.company;
 import javax.swing.*;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.sql.Statement;
 
 public class AddProduct extends JFrame {
 
     public JButton btnAdd = new JButton("Add");
     public JButton btnCancel = new JButton("Cancel");
+    public JButton btnload = new JButton("Load");
+    public JButton btnsave = new JButton("Save");
 
     public SQLiteDataAccess adapter;
     public JTextField txtProductID = new JTextField(20);
@@ -19,10 +30,15 @@ public class AddProduct extends JFrame {
     private DefaultTableModel model = new DefaultTableModel();
     private JTable table = new JTable(model);
 
-    public AddProduct(SQLiteDataAccess db) {
-        adapter = db;
+    String[] cols = {"ProductID", "Name", "Price", "Quantity", "Tax"};
+    InetAddress host = InetAddress.getLocalHost();
+    Socket socket = null;
+    ObjectOutputStream oos = null;
+    ObjectInputStream ois = null;
+
+    public AddProduct() throws IOException, ClassNotFoundException {
         this.setTitle("Add Product");
-        this.setSize(600, 500);
+        this.setSize(700, 500);
         this.getContentPane().setLayout(new BoxLayout(this.getContentPane(), BoxLayout.PAGE_AXIS));
         String[] labels = {"ProductID ", "Name ", "Price ", "Quantity "};
         JPanel addPanel = new JPanel();
@@ -62,21 +78,115 @@ public class AddProduct extends JFrame {
         JPanel panelButtons = new JPanel(new FlowLayout());
         panelButtons.add(btnAdd);
         panelButtons.add(btnCancel);
+        panelButtons.add(btnload);
+        panelButtons.add(btnsave);
         addPanel.add(panelButtons);
         this.getContentPane().add(addPanel);
-        String[] cols = {"ProductID", "Name", "Price", "Quantity", "Tax"};
-        model.setDataVector(db.getProductMatrix().getMatrix(), cols);
-        //add the table to the frame
-        table.setEnabled(false);
+        table.setEnabled(true);
         this.add(new JScrollPane(table));
+        table.getModel().addTableModelListener(new TableModelListener() {
+
+            public void tableChanged(TableModelEvent e) {
+                if(e.getFirstRow() == -1|| e.getColumn() == -1)
+                    return;
+                System.out.println(e.getFirstRow() + " " + e.getColumn());
+                System.out.println(table.getValueAt(e.getFirstRow(), e.getColumn()));
+                if(table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0)
+                {
+                    try {
+                        deleteRow(e.getFirstRow());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+                else
+                {
+                    try {
+                        editValue(e.getFirstRow(), cols[e.getColumn()], table.getValueAt(e.getFirstRow(), e.getColumn()).toString());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        });
+        //table.setVisible(false);
         btnAdd.addActionListener(new AddButtonListener());
         btnCancel.addActionListener(new CancelButtonListener());
+        btnload.addActionListener(new LoadButtonListener());
+        btnsave.addActionListener(new saveButtonListener());
         setVisible(true);
         pack();
+        //getData();
+    }
+    public void deleteRow(int row) throws IOException {
+        socket = new Socket(host.getHostName(), 9000);
+        //write to socket using ObjectOutputStream
+        oos = new ObjectOutputStream(socket.getOutputStream());
+        System.out.println("Sending request to Socket Server");
+        oos.writeObject("product");
+        oos.writeObject("delete");
+        oos.writeObject(row);
+        //read the server response message
+        ois = new ObjectInputStream(socket.getInputStream());
+
+        ois.close();
+        oos.close();
+    }
+    public void getData() throws IOException, ClassNotFoundException {
+        socket = new Socket(host.getHostName(), 9000);
+        //write to socket using ObjectOutputStream
+        oos = new ObjectOutputStream(socket.getOutputStream());
+        System.out.println("Sending request to Socket Server");
+        oos.writeObject("product");
+        oos.writeObject("load");
+        //read the server response message
+        ois = new ObjectInputStream(socket.getInputStream());
+        Object[][] message = (Object[][]) ois.readObject();
+        model.setDataVector(message, cols);
+
+        //System.out.println("Message: " + message);
+        //close resources
+        ois.close();
+        oos.close();
+    }
+    public void editValue(int row, String col, String value) throws IOException {
+        socket = new Socket(host.getHostName(), 9000);
+        //write to socket using ObjectOutputStream
+        oos = new ObjectOutputStream(socket.getOutputStream());
+        System.out.println("Sending request to Socket Server");
+        oos.writeObject("product");
+        oos.writeObject("edit");
+        oos.writeObject(row);
+        oos.writeObject(col);
+        oos.writeObject(value);
+        //read the server response message
+        ois = new ObjectInputStream(socket.getInputStream());
+
+        ois.close();
+        oos.close();
     }
     public void addRow(Object[] row)
     {
         model.addRow(row);
+    }
+    class LoadButtonListener implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent actionEvent) {
+            try {
+                getData();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    class saveButtonListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent ae) {
+//            table.setEnabled(false);
+        }
     }
     class AddButtonListener implements ActionListener {
 
@@ -130,15 +240,21 @@ public class AddProduct extends JFrame {
                 return;
             }
 
-            switch (adapter.saveProduct(product)) {
-                case SQLiteDataAccess.PRODUCT_DUPLICATE_ERROR:
-                    JOptionPane.showMessageDialog(null, "Product NOT added successfully! Duplicate product ID!");
-                    break;
-                default:
+            try {
+                String sql = "INSERT INTO Product(ProductId, Name, Price, Quantity, Tax) VALUES " + product;
+                System.out.println(sql);
+                socket = new Socket(host.getHostName(), 9000);
+                oos = new ObjectOutputStream(socket.getOutputStream());
+                oos.writeObject("product");
+                oos.writeObject("save");
+                oos.writeObject(sql);
+                oos.close();
+                ois.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
                     Object[] temp = {product.mProductID, product.mName, product.mPrice, product.mQuantity, product.mTax};
                     addRow(temp);
-                    JOptionPane.showMessageDialog(null, "Product added successfully!" + product);
-            }
         }
     }
 

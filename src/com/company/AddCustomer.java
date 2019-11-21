@@ -1,14 +1,24 @@
 package com.company;
 import javax.swing.*;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
 
 public class AddCustomer extends JFrame {
 
     public JButton btnAdd = new JButton("Add");
     public JButton btnCancel = new JButton("Cancel");
+    public JButton btnload = new JButton("Load");
+    public JButton btnsave = new JButton("Save");
 
     public SQLiteDataAccess adapter;
     public JTextField txtCustomerID = new JTextField(20);
@@ -18,13 +28,18 @@ public class AddCustomer extends JFrame {
     private DefaultTableModel model = new DefaultTableModel();
     private JTable table = new JTable(model);
 
-    public AddCustomer(SQLiteDataAccess db) {
-        adapter = db;
+    InetAddress host = InetAddress.getLocalHost();
+    Socket socket = null;
+    ObjectOutputStream oos = null;
+    ObjectInputStream ois = null;
+    String[] labels = {"CustomerID ", "Name ", "PhoneNumber ", "ProductID"};
+
+
+    public AddCustomer() throws UnknownHostException {
         this.setTitle("Add Customer");
         this.setSize(600, 400);
         this.getContentPane().setLayout(new BoxLayout(this.getContentPane(), BoxLayout.PAGE_AXIS));
 
-        String[] labels = {"CustomerID ", "Name ", "PhoneNumber ", "ProductID"};
 
         JPanel line1 = new JPanel(new FlowLayout());
         line1.add(new JLabel("CustomerID "));
@@ -48,17 +63,93 @@ public class AddCustomer extends JFrame {
 
         JPanel panelButtons = new JPanel(new FlowLayout());
         panelButtons.add(btnAdd);
+        panelButtons.add(btnload);
+        panelButtons.add(btnsave);
         panelButtons.add(btnCancel);
         this.getContentPane().add(panelButtons);
         String[] cols = {"CustomerID", "Name", "Email", "Phone"};
-        model.setDataVector(db.getCustomerMatrix().getMatrix(), cols);
+        //model.setDataVector(db.getCustomerMatrix().getMatrix(), cols);
         //add the table to the frame
         this.add(new JScrollPane(table));
+        table.getModel().addTableModelListener(new TableModelListener() {
+
+            public void tableChanged(TableModelEvent e) {
+                if(e.getFirstRow() == -1|| e.getColumn() == -1)
+                    return;
+                System.out.println(e.getFirstRow() + " " + e.getColumn());
+                System.out.println(table.getValueAt(e.getFirstRow(), e.getColumn()));
+                if(table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0)
+                {
+                    try {
+                        deleteRow(e.getFirstRow());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+                else
+                {
+                    try {
+                        editValue(e.getFirstRow(), cols[e.getColumn()], table.getValueAt(e.getFirstRow(), e.getColumn()).toString());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        });
         btnAdd.addActionListener(new AddButtonListener());
+        btnload.addActionListener(new LoadButtonListener());
         btnCancel.addActionListener(new CancelButtonCListener());
         setVisible(true);
 
     }
+    public void deleteRow(int row) throws IOException {
+        socket = new Socket(host.getHostName(), 9000);
+        //write to socket using ObjectOutputStream
+        oos = new ObjectOutputStream(socket.getOutputStream());
+        System.out.println("Sending request to Socket Server");
+        oos.writeObject("customer");
+        oos.writeObject("delete");
+        oos.writeObject(row);
+        //read the server response message
+        ois = new ObjectInputStream(socket.getInputStream());
+
+        ois.close();
+        oos.close();
+    }
+    public void getData() throws IOException, ClassNotFoundException {
+        socket = new Socket(host.getHostName(), 9000);
+        //write to socket using ObjectOutputStream
+        oos = new ObjectOutputStream(socket.getOutputStream());
+        System.out.println("Sending request to Socket Server");
+        oos.writeObject("customer");
+        oos.writeObject("load");
+        //read the server response message
+        ois = new ObjectInputStream(socket.getInputStream());
+        Object[][] message = (Object[][]) ois.readObject();
+        model.setDataVector(message, labels);
+
+        //System.out.println("Message: " + message);
+        //close resources
+        ois.close();
+        oos.close();
+    }
+    public void editValue(int row, String col, String value) throws IOException {
+        socket = new Socket(host.getHostName(), 9000);
+        //write to socket using ObjectOutputStream
+        oos = new ObjectOutputStream(socket.getOutputStream());
+        System.out.println("Sending request to Socket Server");
+        oos.writeObject("customer");
+        oos.writeObject("edit");
+        oos.writeObject(row);
+        oos.writeObject(col);
+        oos.writeObject(value);
+        //read the server response message
+        ois = new ObjectInputStream(socket.getInputStream());
+
+        ois.close();
+        oos.close();
+    }
+
     public void addRow(Object[] row)
     {
         model.addRow(row);
@@ -106,14 +197,21 @@ public class AddCustomer extends JFrame {
                 return;
             }
             customer.mEmail = email;
-            switch (adapter.saveProduct(customer)) {
-                case SQLiteDataAccess.PRODUCT_DUPLICATE_ERROR:
-                    JOptionPane.showMessageDialog(null, "customer NOT added successfully! Duplicate product ID!");
-                    break;
-                default:
+            try {
+                String sql = "INSERT INTO Customer(CustomerID, Name, Email, Phone) VALUES " + customer;
+                System.out.println(sql);
+                socket = new Socket(host.getHostName(), 9000);
+                oos = new ObjectOutputStream(socket.getOutputStream());
+                oos.writeObject("customer");
+                oos.writeObject("save");
+                oos.writeObject(sql);
+                ois.close();
+                oos.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
                     Object[] temp = {customer.mCustomerID, customer.mName, customer.mEmail, customer.mPhone};
                     addRow(temp);
-            }
         }
     }
 
@@ -122,6 +220,19 @@ public class AddCustomer extends JFrame {
         @Override
         public void actionPerformed(ActionEvent actionEvent) {
             dispose();
+        }
+    }
+    class LoadButtonListener implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent actionEvent) {
+            try {
+                getData();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
+            }
         }
     }
 

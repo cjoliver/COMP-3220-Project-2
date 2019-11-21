@@ -1,9 +1,18 @@
 package com.company;
 import javax.swing.*;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.sql.Statement;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -13,6 +22,8 @@ public class AddTransaction extends JFrame {
     public JButton btnAdd = new JButton("Add");
     public JButton btnCancel = new JButton("Cancel");
     public JButton btnprint = new JButton("Print Receipt");
+    public JButton btnload = new JButton("Load");
+    public JButton btnsave = new JButton("Save");
 
     public SQLiteDataAccess adapter;
     public JTextField txtPurchaseID = new JTextField(20);
@@ -20,6 +31,7 @@ public class AddTransaction extends JFrame {
     public JTextField txtCustomerID = new JTextField(20);
     public JTextField txtQuantity = new JTextField(20);
     private DefaultTableModel model = new DefaultTableModel();
+    String[] labels = {"PurchaseID ", "ProductID ", "CustomerID ", "Quantity", "Tax", "Total"};
     private JTable table = new JTable(model);
 
     private double taxRate;
@@ -31,12 +43,15 @@ public class AddTransaction extends JFrame {
     private String name;
     private String productName;
 
-    public AddTransaction(SQLiteDataAccess db) {
-        adapter = db;
+    InetAddress host = InetAddress.getLocalHost();
+    Socket socket = null;
+    ObjectOutputStream oos = null;
+    ObjectInputStream ois = null;
+
+    public AddTransaction() throws UnknownHostException {
         this.setTitle("Add Transaction");
         this.setSize(600, 500);
         this.getContentPane().setLayout(new BoxLayout(this.getContentPane(), BoxLayout.PAGE_AXIS));
-        String[] labels = {"PurchaseID ", "ProductID ", "CustomerID ", "Quantity", "Tax", "Total"};
         JPanel addPanel = new JPanel();
         addPanel.setLayout(new BoxLayout(addPanel, BoxLayout.PAGE_AXIS));
         addPanel.setAlignmentX( Component.LEFT_ALIGNMENT );
@@ -62,21 +77,97 @@ public class AddTransaction extends JFrame {
 
         JPanel panelButtons = new JPanel(new FlowLayout());
         panelButtons.add(btnAdd);
+        panelButtons.add(btnload);
+        panelButtons.add(btnsave);
         panelButtons.add(btnCancel);
         panelButtons.add(btnprint);
         btnprint.setVisible(false);
         addPanel.add(panelButtons);
         this.getContentPane().add(addPanel);
-        model.setDataVector(db.getTransactionMatrixMatrix().getMatrix(), labels);
+        //model.setDataVector(db.getTransactionMatrix().getMatrix(), labels);
         //add the table to the frame
-        table.setEnabled(false);
+        table.setEnabled(true);
         this.add(new JScrollPane(table));
         btnAdd.addActionListener(new AddButtonListener());
         btnCancel.addActionListener(new CancelButtonListener());
         btnprint.addActionListener(new PrintListener());
+        btnload.addActionListener(new LoadButtonListener());
+        table.getModel().addTableModelListener(new TableModelListener() {
+
+            public void tableChanged(TableModelEvent e) {
+                if(e.getFirstRow() == -1 || e.getColumn() == -1)
+                    return;
+                System.out.println(e.getFirstRow() + " " + e.getColumn());
+                System.out.println(table.getValueAt(e.getFirstRow(), e.getColumn()));
+                if(table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0)
+                {
+                    try {
+                        deleteRow(e.getFirstRow());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+                else
+                {
+                    try {
+                        editValue(e.getFirstRow(), labels[e.getColumn()], table.getValueAt(e.getFirstRow(), e.getColumn()).toString());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        });
         setVisible(true);
         pack();
     }
+    public void deleteRow(int row) throws IOException {
+        socket = new Socket(host.getHostName(), 9000);
+        //write to socket using ObjectOutputStream
+        oos = new ObjectOutputStream(socket.getOutputStream());
+        System.out.println("Sending request to Socket Server");
+        oos.writeObject("transaction");
+        oos.writeObject("delete");
+        oos.writeObject(row);
+        //read the server response message
+        ois = new ObjectInputStream(socket.getInputStream());
+
+        ois.close();
+        oos.close();
+    }
+    public void getData() throws IOException, ClassNotFoundException {
+        socket = new Socket(host.getHostName(), 9000);
+        //write to socket using ObjectOutputStream
+        oos = new ObjectOutputStream(socket.getOutputStream());
+        System.out.println("Sending request to Socket Server");
+        oos.writeObject("transaction");
+        oos.writeObject("load");
+        //read the server response message
+        ois = new ObjectInputStream(socket.getInputStream());
+        Object[][] message = (Object[][]) ois.readObject();
+        model.setDataVector(message, labels);
+
+        //System.out.println("Message: " + message);
+        //close resources
+        ois.close();
+        oos.close();
+    }
+    public void editValue(int row, String col, String value) throws IOException {
+        socket = new Socket(host.getHostName(), 9000);
+        //write to socket using ObjectOutputStream
+        oos = new ObjectOutputStream(socket.getOutputStream());
+        System.out.println("Sending request to Socket Server");
+        oos.writeObject("transaction");
+        oos.writeObject("edit");
+        oos.writeObject(row);
+        oos.writeObject(col);
+        oos.writeObject(value);
+        //read the server response message
+        ois = new ObjectInputStream(socket.getInputStream());
+
+        ois.close();
+        oos.close();
+    }
+
     public void addRow(Object[] row)
     {
         model.addRow(row);
@@ -89,6 +180,19 @@ public class AddTransaction extends JFrame {
 //            return;
 //        }
 //    }
+class LoadButtonListener implements ActionListener {
+
+    @Override
+    public void actionPerformed(ActionEvent actionEvent) {
+        try {
+            getData();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+}
     class PrintListener implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent actionEvent) {
@@ -111,7 +215,7 @@ public class AddTransaction extends JFrame {
         System.out.println("|___________________________________|");
     }
 }
-    class AddButtonListener implements ActionListener {
+    class AddButtonListener implements ActionListener{
 
         @Override
         public void actionPerformed(ActionEvent actionEvent) {
@@ -160,17 +264,43 @@ public class AddTransaction extends JFrame {
                 JOptionPane.showMessageDialog(null, "Quantity is invalid!");
                 return;
             }
-            String s = (String) adapter.getProductMatrix().get(ModelT.mProductID - 1,2);
+            //write to socket using ObjectOutputStream
+            System.out.println("Sending request to Socket Server");
+            Object[][] message = null, message1 = null;
+            try {
+                socket = new Socket(host.getHostName(), 9000);
+                oos = new ObjectOutputStream(socket.getOutputStream());
+                oos.writeObject("product");
+                oos.writeObject("load");
+                ois = new ObjectInputStream(socket.getInputStream());
+
+                message = (Object[][]) ois.readObject();
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+            try {
+                socket = new Socket(host.getHostName(), 9000);
+                oos = new ObjectOutputStream(socket.getOutputStream());
+                oos.writeObject("customer");
+                oos.writeObject("load");
+                ois = new ObjectInputStream(socket.getInputStream());
+                message1 = (Object[][]) ois.readObject();
+
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+
+            String s = (String) message[ModelT.mProductID - 1][2];
             cost = Double.parseDouble(s);
-            s = (String) adapter.getProductMatrix().get(ModelT.mProductID - 1, 4);
+            s = (String) message[ModelT.mProductID - 1][4];
             taxRate = Double.parseDouble(s);
             amount = ModelT.mQuantity;
             tax = cost * taxRate;
             taxTotal = tax * amount;
             total = (amount * cost) + taxTotal;
-            s = (String) adapter.getCustomerMatrix().get(ModelT.mCustomerID - 1, 1);
+            s = (String) message1[ModelT.mCustomerID - 1][1];
             name = s;
-            s = (String) adapter.getProductMatrix().get(ModelT.mProductID - 1, 1);
+            s = (String) message[ModelT.mProductID - 1][1];
             productName = s;
             System.out.println(s);
 
@@ -178,16 +308,23 @@ public class AddTransaction extends JFrame {
             Object[] temp = {ModelT.mPurchaseID, ModelT.mProductID, ModelT.mCustomerID, df2.format(ModelT.mQuantity), df2.format(taxTotal) , df2.format(total)};
             ModelT.mTax = taxTotal;
             ModelT.mTotal = total;
-            switch (adapter.saveProduct(ModelT)) {
-                case SQLiteDataAccess.PRODUCT_DUPLICATE_ERROR:
-                    JOptionPane.showMessageDialog(null, "Transaction NOT added successfully! Duplicate product ID!");
-                    break;
-                default:
+            String sql = "INSERT INTO Trans(PurchaseID, ProductID, CustomerID, Quantity, Tax, Total) VALUES " + ModelT;
+            System.out.println(sql);
+            try {
+                socket = new Socket(host.getHostName(), 9000);
+                oos = new ObjectOutputStream(socket.getOutputStream());
+                oos.writeObject("transaction");
+                oos.writeObject("save");
+                oos.writeObject(sql);
 
-                    addRow(temp);
-                    btnprint.setVisible(true);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
+
+            addRow(temp);
+            btnprint.setVisible(true);
         }
+
     }
 
     class CancelButtonListener implements ActionListener {

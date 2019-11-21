@@ -5,6 +5,8 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.io.IOException;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import com.bulenkov.darcula.*;
 
@@ -16,13 +18,14 @@ public class MainMenuView extends JFrame {
     public JButton btnChangeDB = new JButton("Change DB");
 
     JPanel panelButtons1 = new JPanel();
-    public SQLiteDataAccess adapter;
+    //public SQLiteDataAccess adapter;
     public JTextField username = new JTextField(20);
     public JPasswordField password = new JPasswordField(20);
     public JButton login = new JButton("Login");
 
     public MainMenuView(SQLiteDataAccess db) {
-        adapter = db;
+        //adapter = db;
+        Dynamic2DArray thing = new Dynamic2DArray();
         this.setTitle("Store Management");
         this.setSize(600, 400);
         this.getContentPane().setLayout(new BoxLayout(this.getContentPane(), BoxLayout.PAGE_AXIS));
@@ -59,7 +62,7 @@ public class MainMenuView extends JFrame {
         panelButtons1.add(pro);
         panelButtons1.add(cust);
         panelButtons1.add(trans);
-        panelButtons1.add(btnChangeDB);
+//        panelButtons1.add(btnChangeDB);
         panelButtons1.setVisible(false);
         this.getContentPane().add(loginPanel);
         this.getContentPane().add(panelButtons1);
@@ -67,7 +70,7 @@ public class MainMenuView extends JFrame {
         pro.addActionListener(new ProductButtonListener());
         cust.addActionListener(new CustomerButtonListener());
         trans.addActionListener(new TransactionButtonListener());
-        btnChangeDB.addActionListener(new DBFileListener());
+//        btnChangeDB.addActionListener(new DBFileListener());
         login.addActionListener(new LoginButtonListener());
         password.addActionListener(new LoginButtonListener());
 
@@ -79,12 +82,21 @@ public class MainMenuView extends JFrame {
         public void actionPerformed(ActionEvent ae) {
             try {
                 String s1 = "admin";
+                String s2 = "Jarrod";
                 String a1 = username.getText();
 
                 if (s1.equals(a1) && isPasswordCorrect(password.getPassword())) {
                     panelButtons1.setVisible(true);
+                    pro.setVisible(true);
+                    cust.setVisible(true);
                     pack();
 
+                }
+                else if(s2.equals(a1) && isPasswordUser(password.getPassword())) {
+                    panelButtons1.setVisible(true);
+                    cust.setVisible(true);
+                    pro.setVisible(false);
+                    pack();
                 } else {
                     JDialog dialog = new JDialog();
                     dialog.setAlwaysOnTop(true);
@@ -95,23 +107,29 @@ public class MainMenuView extends JFrame {
             }
         }
     }
-    class DBFileListener implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent ae) {
-            JFileChooser j = new JFileChooser("d:");
-            j.showOpenDialog(null);
-            File file = j.getSelectedFile();
-            adapter.connect(file.getAbsolutePath());
-            System.out.print(file.getAbsolutePath());
-        }
-    }
+//    class DBFileListener implements ActionListener {
+//        @Override
+//        public void actionPerformed(ActionEvent ae) {
+//            JFileChooser j = new JFileChooser("d:");
+//            j.showOpenDialog(null);
+//            File file = j.getSelectedFile();
+//            adapter.connect(file.getAbsolutePath());
+//            System.out.print(file.getAbsolutePath());
+//        }
+//    }
 
     class ProductButtonListener implements ActionListener {
 
         @Override
         public void actionPerformed(ActionEvent actionEvent) {
-            adapter.loadProduct();
-            AddProduct apView = new AddProduct(adapter);
+            //adapter.loadProduct();
+            try {
+                AddProduct apView = new AddProduct();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -119,8 +137,11 @@ public class MainMenuView extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent actionEvent) {
-            adapter.loadCustomer();
-            AddCustomer csView = new AddCustomer(adapter);
+            try {
+                AddCustomer csView = new AddCustomer();
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -128,15 +149,32 @@ public class MainMenuView extends JFrame {
 
         @Override
         public void actionPerformed(ActionEvent actionEvent) {
-            adapter.loadTransaction();
-            adapter.loadProduct();
-            adapter.loadCustomer();
-            AddTransaction tView = new AddTransaction(adapter);
+            AddTransaction tView;
+            try {
+                tView = new AddTransaction();
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
         }
     }
     private static boolean isPasswordCorrect(char[] input) {
         boolean isCorrect = true;
         char[] correctPassword = { 'a', 'd', 'm', 'i', 'n'};
+
+        if (input.length != correctPassword.length) {
+            isCorrect = false;
+        } else {
+            isCorrect = Arrays.equals (input, correctPassword);
+        }
+
+        //Zero out the password.
+        Arrays.fill(correctPassword,'0');
+
+        return isCorrect;
+    }
+    private static boolean isPasswordUser(char[] input) {
+        boolean isCorrect = true;
+        char[] correctPassword = { 'p', 'a', 's', 's', 'w', 'o', 'r', 'd'};
 
         if (input.length != correctPassword.length) {
             isCorrect = false;
