@@ -4,6 +4,8 @@ import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
@@ -13,6 +15,8 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.sql.Statement;
+import java.util.LinkedList;
+import java.util.Stack;
 
 public class AddProduct extends JFrame {
 
@@ -29,6 +33,7 @@ public class AddProduct extends JFrame {
     public JTextField txtTax = new JTextField(20);
     private DefaultTableModel model = new DefaultTableModel();
     private JTable table = new JTable(model);
+    private List<TableModelEvent> edits = new ArrayList<TableModelEvent>();
 
     String[] cols = {"ProductID", "Name", "Price", "Quantity", "Tax"};
     InetAddress host = InetAddress.getLocalHost();
@@ -84,30 +89,9 @@ public class AddProduct extends JFrame {
         this.getContentPane().add(addPanel);
         table.setEnabled(true);
         this.add(new JScrollPane(table));
-        table.getModel().addTableModelListener(new TableModelListener() {
-
-            public void tableChanged(TableModelEvent e) {
-                if(e.getFirstRow() == -1|| e.getColumn() == -1)
-                    return;
-                System.out.println(e.getFirstRow() + " " + e.getColumn());
-                System.out.println(table.getValueAt(e.getFirstRow(), e.getColumn()));
-                if(table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0)
-                {
-                    try {
-                        deleteRow(e.getFirstRow());
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-                else
-                {
-                    try {
-                        editValue(e.getFirstRow(), cols[e.getColumn()], table.getValueAt(e.getFirstRow(), e.getColumn()).toString());
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-            }
+        table.getModel().addTableModelListener(e -> {
+            edits.add(e);
+            System.out.println(e.toString());
         });
         //table.setVisible(false);
         btnAdd.addActionListener(new AddButtonListener());
@@ -160,7 +144,7 @@ public class AddProduct extends JFrame {
         oos.writeObject(col);
         oos.writeObject(value);
         //read the server response message
-        ois = new ObjectInputStream(socket.getInputStream());
+//        ois = new ObjectInputStream(socket.getInputStream());
 
         ois.close();
         oos.close();
@@ -184,8 +168,29 @@ public class AddProduct extends JFrame {
     }
     class saveButtonListener implements ActionListener {
         @Override
-        public void actionPerformed(ActionEvent ae) {
-//            table.setEnabled(false);
+        public void actionPerformed(ActionEvent actionEvent) {
+            System.out.println("save button" + edits.size());
+            for (TableModelEvent e : edits) {
+                System.out.println("herererr");
+                if (e.getFirstRow() == -1 || e.getColumn() == -1) {
+
+                }
+//                System.out.println(e.getFirstRow() + " " + e.getColumn());
+//                System.out.println(table.getValueAt(e.getFirstRow(), e.getColumn()));
+                else if (table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0) {
+                    try {
+                        deleteRow(e.getFirstRow());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                } else {
+                    try {
+                        editValue(e.getFirstRow(), cols[e.getColumn()], table.getValueAt(e.getFirstRow(), e.getColumn()).toString());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
         }
     }
     class AddButtonListener implements ActionListener {
