@@ -15,7 +15,10 @@ import java.net.UnknownHostException;
 import java.sql.Statement;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+
 //HELLO
 public class AddTransaction extends JFrame {
 
@@ -25,7 +28,7 @@ public class AddTransaction extends JFrame {
     public JButton btnload = new JButton("Load");
     public JButton btnsave = new JButton("Save");
 
-    public SQLiteDataAccess adapter;
+    private List<TableModelEvent> edits = new ArrayList<TableModelEvent>();
     public JTextField txtPurchaseID = new JTextField(20);
     public JTextField txtProductID = new JTextField(20);
     public JTextField txtCustomerID = new JTextField(20);
@@ -92,30 +95,10 @@ public class AddTransaction extends JFrame {
         btnCancel.addActionListener(new CancelButtonListener());
         btnprint.addActionListener(new PrintListener());
         btnload.addActionListener(new LoadButtonListener());
-        table.getModel().addTableModelListener(new TableModelListener() {
-
-            public void tableChanged(TableModelEvent e) {
-                if(e.getFirstRow() == -1 || e.getColumn() == -1)
-                    return;
-                System.out.println(e.getFirstRow() + " " + e.getColumn());
-                System.out.println(table.getValueAt(e.getFirstRow(), e.getColumn()));
-                if(table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0)
-                {
-                    try {
-                        deleteRow(e.getFirstRow());
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-                else
-                {
-                    try {
-                        editValue(e.getFirstRow(), labels[e.getColumn()], table.getValueAt(e.getFirstRow(), e.getColumn()).toString());
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-            }
+        btnsave.addActionListener(new saveButtonListener());
+        table.getModel().addTableModelListener(e -> {
+            edits.add(e);
+            System.out.println(e.toString());
         });
         setVisible(true);
         pack();
@@ -129,9 +112,6 @@ public class AddTransaction extends JFrame {
         oos.writeObject("delete");
         oos.writeObject(row);
         //read the server response message
-        ois = new ObjectInputStream(socket.getInputStream());
-
-        ois.close();
         oos.close();
     }
     public void getData() throws IOException, ClassNotFoundException {
@@ -161,10 +141,6 @@ public class AddTransaction extends JFrame {
         oos.writeObject(row);
         oos.writeObject(col);
         oos.writeObject(value);
-        //read the server response message
-        ois = new ObjectInputStream(socket.getInputStream());
-
-        ois.close();
         oos.close();
     }
 
@@ -172,14 +148,7 @@ public class AddTransaction extends JFrame {
     {
         model.addRow(row);
     }
-//    public String gs(Object o){
-//        try {
-//            String s = Integer.parseInt(id);
-//        } catch (NumberFormatException e) {
-//            JOptionPane.showMessageDialog(null, "PurchaseID is invalid!");
-//            return;
-//        }
-//    }
+
 class LoadButtonListener implements ActionListener {
 
     @Override
@@ -332,6 +301,32 @@ class LoadButtonListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent actionEvent) {
             dispose();
+        }
+    }
+    class saveButtonListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent actionEvent) {
+            System.out.println("save button" + edits.size());
+            for (TableModelEvent e : edits) {
+                if (e.getFirstRow() == -1 || e.getColumn() == -1) {
+
+                }
+//                System.out.println(e.getFirstRow() + " " + e.getColumn());
+//                System.out.println(table.getValueAt(e.getFirstRow(), e.getColumn()));
+                else if (table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0) {
+                    try {
+                        deleteRow(e.getFirstRow());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                } else {
+                    try {
+                        editValue(e.getFirstRow(), labels[e.getColumn()], table.getValueAt(e.getFirstRow(), e.getColumn()).toString());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
         }
     }
 

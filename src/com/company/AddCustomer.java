@@ -12,6 +12,8 @@ import java.io.ObjectOutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AddCustomer extends JFrame {
 
@@ -20,7 +22,7 @@ public class AddCustomer extends JFrame {
     public JButton btnload = new JButton("Load");
     public JButton btnsave = new JButton("Save");
 
-    public SQLiteDataAccess adapter;
+    private List<TableModelEvent> edits = new ArrayList<TableModelEvent>();
     public JTextField txtCustomerID = new JTextField(20);
     public JTextField txtName = new JTextField(20);
     public JTextField txtPhone = new JTextField(20);
@@ -71,34 +73,14 @@ public class AddCustomer extends JFrame {
         //model.setDataVector(db.getCustomerMatrix().getMatrix(), cols);
         //add the table to the frame
         this.add(new JScrollPane(table));
-        table.getModel().addTableModelListener(new TableModelListener() {
-
-            public void tableChanged(TableModelEvent e) {
-                if(e.getFirstRow() == -1|| e.getColumn() == -1)
-                    return;
-                System.out.println(e.getFirstRow() + " " + e.getColumn());
-                System.out.println(table.getValueAt(e.getFirstRow(), e.getColumn()));
-                if(table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0)
-                {
-                    try {
-                        deleteRow(e.getFirstRow());
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-                else
-                {
-                    try {
-                        editValue(e.getFirstRow(), cols[e.getColumn()], table.getValueAt(e.getFirstRow(), e.getColumn()).toString());
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-            }
-        });
         btnAdd.addActionListener(new AddButtonListener());
         btnload.addActionListener(new LoadButtonListener());
         btnCancel.addActionListener(new CancelButtonCListener());
+        btnsave.addActionListener(new saveButtonListener());
+        table.getModel().addTableModelListener(e -> {
+            edits.add(e);
+            System.out.println(e.toString());
+        });
         setVisible(true);
 
     }
@@ -144,9 +126,6 @@ public class AddCustomer extends JFrame {
         oos.writeObject(col);
         oos.writeObject(value);
         //read the server response message
-        ois = new ObjectInputStream(socket.getInputStream());
-
-        ois.close();
         oos.close();
     }
 
@@ -235,6 +214,31 @@ public class AddCustomer extends JFrame {
             }
         }
     }
+    class saveButtonListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent actionEvent) {
+            System.out.println("save button" + edits.size());
+            for (TableModelEvent e : edits) {
+                if (e.getFirstRow() == -1 || e.getColumn() == -1) {
 
+                }
+//                System.out.println(e.getFirstRow() + " " + e.getColumn());
+//                System.out.println(table.getValueAt(e.getFirstRow(), e.getColumn()));
+                else if (table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0) {
+                    try {
+                        deleteRow(e.getFirstRow());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                } else {
+                    try {
+                        editValue(e.getFirstRow(), labels[e.getColumn()], table.getValueAt(e.getFirstRow(), e.getColumn()).toString());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        }
+    }
 
 }

@@ -171,7 +171,6 @@ public class AddProduct extends JFrame {
         public void actionPerformed(ActionEvent actionEvent) {
             System.out.println("save button" + edits.size());
             for (TableModelEvent e : edits) {
-                System.out.println("herererr");
                 if (e.getFirstRow() == -1 || e.getColumn() == -1) {
 
                 }
