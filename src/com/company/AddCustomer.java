@@ -3,6 +3,7 @@ import javax.swing.*;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -29,15 +30,16 @@ public class AddCustomer extends JFrame {
     public JTextField txtEmail = new JTextField(20);
     private DefaultTableModel model = new DefaultTableModel();
     private JTable table = new JTable(model);
+    private TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<DefaultTableModel>(model);
 
     InetAddress host = InetAddress.getLocalHost();
     Socket socket = null;
     ObjectOutputStream oos = null;
     ObjectInputStream ois = null;
-    String[] labels = {"CustomerID ", "Name ", "PhoneNumber ", "ProductID"};
+    String[] labels = {"CustomerID", "Name", "Email", "Phone", "Password", "Authentication"};
 
 
-    public AddCustomer() throws UnknownHostException {
+    public AddCustomer(String[] auth) throws UnknownHostException {
         this.setTitle("Add Customer");
         this.setSize(600, 400);
         this.getContentPane().setLayout(new BoxLayout(this.getContentPane(), BoxLayout.PAGE_AXIS));
@@ -68,8 +70,9 @@ public class AddCustomer extends JFrame {
         panelButtons.add(btnload);
         panelButtons.add(btnsave);
         panelButtons.add(btnCancel);
+        table.setRowSorter(sorter);
         this.getContentPane().add(panelButtons);
-        String[] cols = {"CustomerID", "Name", "Email", "Phone"};
+        String[] cols = {"CustomerID", "Name", "Email", "Phone", "Password", "Authentication"};
         //model.setDataVector(db.getCustomerMatrix().getMatrix(), cols);
         //add the table to the frame
         this.add(new JScrollPane(table));
@@ -82,7 +85,6 @@ public class AddCustomer extends JFrame {
             System.out.println(e.toString());
         });
         setVisible(true);
-
     }
     public void deleteRow(int row) throws IOException {
         socket = new Socket(host.getHostName(), 9000);
@@ -114,6 +116,7 @@ public class AddCustomer extends JFrame {
         //close resources
         ois.close();
         oos.close();
+        sorter.setRowFilter(RowFilter.regexFilter("user"));
     }
     public void editValue(int row, String col, String value) throws IOException {
         socket = new Socket(host.getHostName(), 9000);
@@ -176,8 +179,10 @@ public class AddCustomer extends JFrame {
                 return;
             }
             customer.mEmail = email;
+            customer.mPass = "pass";
+            customer.mAuth = "user";
             try {
-                String sql = "INSERT INTO Customer(CustomerID, Name, Email, Phone) VALUES " + customer;
+                String sql = "INSERT INTO Customer(CustomerID, Name, Email, Phone, Password, Authentication) VALUES " + customer;
                 System.out.println(sql);
                 socket = new Socket(host.getHostName(), 9000);
                 oos = new ObjectOutputStream(socket.getOutputStream());
@@ -189,7 +194,7 @@ public class AddCustomer extends JFrame {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-                    Object[] temp = {customer.mCustomerID, customer.mName, customer.mEmail, customer.mPhone};
+                    Object[] temp = {customer.mCustomerID, customer.mName, customer.mEmail, customer.mPhone, customer.mPass, customer.mAuth};
                     addRow(temp);
         }
     }

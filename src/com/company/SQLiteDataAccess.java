@@ -34,6 +34,15 @@ public class SQLiteDataAccess {
                 ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
                 //convert ObjectInputStream object to String
                 String message = (String) ois.readObject();
+                if(message.equals("login"))
+                {
+                    String username = (String) ois.readObject();
+                    String password = (String) ois.readObject();
+                    String[] auth = db.loadUsers(username, password);
+                    ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+                    oos.writeObject(auth);
+                    System.out.println(username + ": " + password);
+                }
                 if(message.equals("product"))
                 {
                     String message2 = (String) ois.readObject();
@@ -306,14 +315,46 @@ public class SQLiteDataAccess {
                 String name = rs.getString("Name");
                 String job = rs.getString("Email");
                 String Quantity = rs.getString("Phone");
+                String pass = rs.getString("Password");
+                String auth = rs.getString("Authentication");
                 CustomerMatrix.set(rs.getRow()-1, 0, id);
                 CustomerMatrix.set(rs.getRow()-1, 1, name);
                 CustomerMatrix.set(rs.getRow()-1, 2, job);
                 CustomerMatrix.set(rs.getRow()-1, 3, Quantity);
+                CustomerMatrix.set(rs.getRow()-1, 4, pass);
+                CustomerMatrix.set(rs.getRow()-1, 5, auth);
             }
         } catch(SQLException e) {
             System.out.println("SQL exception occured" + e);
         }
+    }
+    public String[] loadUsers(String username, String password) {
+        String[] auth = new String[2];
+        try{
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT * FROM Customer");
+            while (rs.next()) {
+                int id = rs.getInt("CustomerID");
+                String pass = rs.getString("Password");
+                auth[0] = rs.getString("Authentication");
+                auth[1] = rs.getString("Name");
+                if(id == Integer.parseInt(username))
+                {
+                    System.out.println("Good ID" + password);
+                    if(pass.equals(password))
+                    {
+                        System.out.println("Good Pass");
+                        return auth;
+                    }
+                }
+            }
+            auth[0] = "BadLogin";
+            return auth;
+        } catch(SQLException e) {
+            System.out.println("SQL exception occured" + e);
+        }
+        auth[0] = "BadLogin";
+        return auth;
     }
     public void loadTransaction() {
         TransactionMatrix.reset();
@@ -340,53 +381,6 @@ public class SQLiteDataAccess {
             System.out.println("SQL exception occured" + e);
         }
     }
-    public int saveProduct(ProductModel product) {
-        try {
-            String sql = "INSERT INTO Product(ProductId, Name, Price, Quantity, Tax) VALUES " + product;
-            System.out.println(sql);
-            Statement stmt = conn.createStatement();
-            stmt.executeUpdate(sql);
 
-        } catch (Exception e) {
-            String msg = e.getMessage();
-            System.out.println(msg);
-            if (msg.contains("UNIQUE constraint failed"))
-                return PRODUCT_DUPLICATE_ERROR;
-        }
-
-        return PRODUCT_SAVED_OK;
-    }
-    public int saveProduct(TransactionModel product) {
-        try {
-            String sql = "INSERT INTO Trans(PurchaseID, ProductID, CustomerID, Quantity, Tax, Total) VALUES " + product;
-            System.out.println(sql);
-            Statement stmt = conn.createStatement();
-            stmt.executeUpdate(sql);
-
-        } catch (Exception e) {
-            String msg = e.getMessage();
-            System.out.println(msg);
-            if (msg.contains("UNIQUE constraint failed"))
-                return PRODUCT_DUPLICATE_ERROR;
-        }
-
-        return PRODUCT_SAVED_OK;
-    }
-    public int saveProduct(CustomerModel model) {
-        try {
-            String sql = "INSERT INTO Customer(CustomerID, Name, Email, Phone) VALUES " + model;
-            System.out.println(sql);
-            Statement stmt = conn.createStatement();
-            stmt.executeUpdate(sql);
-
-        } catch (Exception e) {
-            String msg = e.getMessage();
-            System.out.println(msg);
-            if (msg.contains("UNIQUE constraint failed"))
-                return PRODUCT_DUPLICATE_ERROR;
-        }
-
-        return PRODUCT_SAVED_OK;
-    }
 
 }

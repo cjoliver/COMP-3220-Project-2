@@ -6,6 +6,10 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import com.bulenkov.darcula.*;
@@ -20,10 +24,17 @@ public class MainMenuView extends JFrame {
     JPanel panelButtons1 = new JPanel();
     //public SQLiteDataAccess adapter;
     public JTextField username = new JTextField(20);
-    public JPasswordField password = new JPasswordField(20);
+    public JTextField password = new JTextField(20);
     public JButton login = new JButton("Login");
+    private JLabel authStatus = new JLabel("Not Logged in");
+    private String[] auth;
 
-    public MainMenuView(SQLiteDataAccess db) {
+    InetAddress host = InetAddress.getLocalHost();
+    Socket socket = null;
+    ObjectOutputStream oos = null;
+    ObjectInputStream ois = null;
+
+    public MainMenuView(SQLiteDataAccess db) throws UnknownHostException {
         //adapter = db;
         Dynamic2DArray thing = new Dynamic2DArray();
         this.setTitle("Store Management");
@@ -55,6 +66,8 @@ public class MainMenuView extends JFrame {
         loginPanel1.setLayout(box1);
         loginPanel1.add(Box.createRigidArea(new Dimension(200, 0)));
         loginPanel1.add(login);
+        loginPanel1.add(authStatus);
+        authStatus.setForeground(Color.red);
         loginPanel.add(loginPanel1);
 
         BoxLayout box2 = new BoxLayout(panelButtons1, BoxLayout.X_AXIS);
@@ -81,29 +94,39 @@ public class MainMenuView extends JFrame {
         @Override
         public void actionPerformed(ActionEvent ae) {
             try {
-                String s1 = "admin";
-                String s2 = "Jarrod";
+                socket = new Socket(host.getHostName(), 9000);
+                //write to socket using ObjectOutputStream
+                oos = new ObjectOutputStream(socket.getOutputStream());
                 String a1 = username.getText();
-
-                if (s1.equals(a1) && isPasswordCorrect(password.getPassword())) {
+                oos.writeObject("login");
+                oos.writeObject(username.getText());
+                oos.writeObject(password.getText());
+                ois = new ObjectInputStream(socket.getInputStream());
+                auth = (String[])ois.readObject();
+                System.out.println(auth);
+                ois.close();
+                if(!auth[0].equals("BadLogin")) {
+                    if(auth[0].equals("user"))
+                        authStatus.setText(auth[1]);
+                    else
+                        authStatus.setText(auth[0]);
+                    authStatus.setForeground(Color.green);
                     panelButtons1.setVisible(true);
                     pro.setVisible(true);
                     cust.setVisible(true);
                     pack();
-
                 }
-                else if(s2.equals(a1) && isPasswordUser(password.getPassword())) {
-                    panelButtons1.setVisible(true);
-                    cust.setVisible(true);
-                    pro.setVisible(false);
-                    pack();
-                } else {
-                    JDialog dialog = new JDialog();
-                    dialog.setAlwaysOnTop(true);
-                    JOptionPane.showMessageDialog(dialog, "Username or Password is incorrect" , null , JOptionPane.PLAIN_MESSAGE );
+                else {
+                    authStatus.setText("Bad Login");
+                    authStatus.setForeground(Color.red);
                 }
-            } catch (Exception e) {
 
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
             }
         }
     }
@@ -124,7 +147,7 @@ public class MainMenuView extends JFrame {
         public void actionPerformed(ActionEvent actionEvent) {
             //adapter.loadProduct();
             try {
-                AddProduct apView = new AddProduct();
+                AddProduct apView = new AddProduct(auth);
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (ClassNotFoundException e) {
@@ -138,7 +161,7 @@ public class MainMenuView extends JFrame {
         @Override
         public void actionPerformed(ActionEvent actionEvent) {
             try {
-                AddCustomer csView = new AddCustomer();
+                AddCustomer csView = new AddCustomer(auth);
             } catch (UnknownHostException e) {
                 e.printStackTrace();
             }
@@ -151,43 +174,13 @@ public class MainMenuView extends JFrame {
         public void actionPerformed(ActionEvent actionEvent) {
             AddTransaction tView;
             try {
-                tView = new AddTransaction();
+                tView = new AddTransaction(auth);
             } catch (UnknownHostException e) {
                 e.printStackTrace();
             }
         }
     }
-    private static boolean isPasswordCorrect(char[] input) {
-        boolean isCorrect = true;
-        char[] correctPassword = { 'a', 'd', 'm', 'i', 'n'};
-
-        if (input.length != correctPassword.length) {
-            isCorrect = false;
-        } else {
-            isCorrect = Arrays.equals (input, correctPassword);
-        }
-
-        //Zero out the password.
-        Arrays.fill(correctPassword,'0');
-
-        return isCorrect;
-    }
-    private static boolean isPasswordUser(char[] input) {
-        boolean isCorrect = true;
-        char[] correctPassword = { 'p', 'a', 's', 's', 'w', 'o', 'r', 'd'};
-
-        if (input.length != correctPassword.length) {
-            isCorrect = false;
-        } else {
-            isCorrect = Arrays.equals (input, correctPassword);
-        }
-
-        //Zero out the password.
-        Arrays.fill(correctPassword,'0');
-
-        return isCorrect;
-    }
-    public static void main(String[] args) {
+    public static void main(String[] args) throws UnknownHostException {
         BasicLookAndFeel darculaLookAndFeel = new DarculaLaf();
         try {
             //UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());

@@ -3,6 +3,7 @@ import javax.swing.*;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +25,7 @@ public class AddProduct extends JFrame {
     public JButton btnCancel = new JButton("Cancel");
     public JButton btnload = new JButton("Load");
     public JButton btnsave = new JButton("Save");
+    public JButton btnfilter = new JButton("Filter");
 
     public SQLiteDataAccess adapter;
     public JTextField txtProductID = new JTextField(20);
@@ -31,9 +33,11 @@ public class AddProduct extends JFrame {
     public JTextField txtPrice = new JTextField(20);
     public JTextField txtQuantity = new JTextField(20);
     public JTextField txtTax = new JTextField(20);
+    public JTextField txtFilter = new JTextField(20);
     private DefaultTableModel model = new DefaultTableModel();
     private JTable table = new JTable(model);
     private List<TableModelEvent> edits = new ArrayList<TableModelEvent>();
+    private TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<DefaultTableModel>(model);
 
     String[] cols = {"ProductID", "Name", "Price", "Quantity", "Tax"};
     InetAddress host = InetAddress.getLocalHost();
@@ -41,10 +45,11 @@ public class AddProduct extends JFrame {
     ObjectOutputStream oos = null;
     ObjectInputStream ois = null;
 
-    public AddProduct() throws IOException, ClassNotFoundException {
+    public AddProduct(String[] auth) throws IOException, ClassNotFoundException {
         this.setTitle("Add Product");
         this.setSize(700, 500);
         this.getContentPane().setLayout(new BoxLayout(this.getContentPane(), BoxLayout.PAGE_AXIS));
+
         String[] labels = {"ProductID ", "Name ", "Price ", "Quantity "};
         JPanel addPanel = new JPanel();
         addPanel.setLayout(new BoxLayout(addPanel, BoxLayout.PAGE_AXIS));
@@ -80,15 +85,24 @@ public class AddProduct extends JFrame {
         line5.setAlignmentX( Component.RIGHT_ALIGNMENT );
         addPanel.add(line5);
 
+        JPanel line6 = new JPanel(new FlowLayout());
+        line6.add(new JLabel("Filter "));
+        line6.add(txtFilter);
+        line6.setAlignmentX( Component.RIGHT_ALIGNMENT );
+        addPanel.add(line6);
+
+
         JPanel panelButtons = new JPanel(new FlowLayout());
         panelButtons.add(btnAdd);
         panelButtons.add(btnCancel);
         panelButtons.add(btnload);
         panelButtons.add(btnsave);
+        panelButtons.add(btnfilter);
         addPanel.add(panelButtons);
         this.getContentPane().add(addPanel);
         table.setEnabled(true);
         this.add(new JScrollPane(table));
+        table.setRowSorter(sorter);
         table.getModel().addTableModelListener(e -> {
             edits.add(e);
             System.out.println(e.toString());
@@ -98,6 +112,7 @@ public class AddProduct extends JFrame {
         btnCancel.addActionListener(new CancelButtonListener());
         btnload.addActionListener(new LoadButtonListener());
         btnsave.addActionListener(new saveButtonListener());
+        btnfilter.addActionListener(new filterListener());
         setVisible(true);
         pack();
         //getData();
@@ -176,13 +191,14 @@ public class AddProduct extends JFrame {
                 }
 //                System.out.println(e.getFirstRow() + " " + e.getColumn());
 //                System.out.println(table.getValueAt(e.getFirstRow(), e.getColumn()));
-                else if (table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0) {
-                    try {
-                        deleteRow(e.getFirstRow());
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                } else {
+//                else if (table.getValueAt(e.getFirstRow(), e.getColumn()).toString().length() == 0 && e.getColumn() == 0) {
+//                    try {
+//                        deleteRow(e.getFirstRow());
+//                    } catch (IOException ex) {
+//                        ex.printStackTrace();
+//                    }
+//                }
+                else {
                     try {
                         editValue(e.getFirstRow(), cols[e.getColumn()], table.getValueAt(e.getFirstRow(), e.getColumn()).toString());
                     } catch (IOException ex) {
@@ -269,6 +285,19 @@ public class AddProduct extends JFrame {
             dispose();
         }
     }
+    class filterListener implements ActionListener {
 
+        @Override
+        public void actionPerformed(ActionEvent actionEvent) {
+            String text = txtFilter.getText();
+            if (text.length() == 0) {
+                sorter.setRowFilter(null);
+            } else {
+                sorter.setRowFilter(RowFilter.regexFilter(text));
+
+            }
+
+        }
+    }
 
 }

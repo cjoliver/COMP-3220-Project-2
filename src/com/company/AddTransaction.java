@@ -3,6 +3,7 @@ import javax.swing.*;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -45,13 +46,14 @@ public class AddTransaction extends JFrame {
     private double amount;
     private String name;
     private String productName;
+    private TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<DefaultTableModel>(model);
 
     InetAddress host = InetAddress.getLocalHost();
     Socket socket = null;
     ObjectOutputStream oos = null;
     ObjectInputStream ois = null;
 
-    public AddTransaction() throws UnknownHostException {
+    public AddTransaction(String[] auth) throws UnknownHostException {
         this.setTitle("Add Transaction");
         this.setSize(600, 500);
         this.getContentPane().setLayout(new BoxLayout(this.getContentPane(), BoxLayout.PAGE_AXIS));
@@ -89,6 +91,7 @@ public class AddTransaction extends JFrame {
         this.getContentPane().add(addPanel);
         //model.setDataVector(db.getTransactionMatrix().getMatrix(), labels);
         //add the table to the frame
+        table.setRowSorter(sorter);
         table.setEnabled(true);
         this.add(new JScrollPane(table));
         btnAdd.addActionListener(new AddButtonListener());
@@ -102,6 +105,7 @@ public class AddTransaction extends JFrame {
         });
         setVisible(true);
         pack();
+
     }
     public void deleteRow(int row) throws IOException {
         socket = new Socket(host.getHostName(), 9000);
@@ -125,7 +129,13 @@ public class AddTransaction extends JFrame {
         ois = new ObjectInputStream(socket.getInputStream());
         Object[][] message = (Object[][]) ois.readObject();
         model.setDataVector(message, labels);
-
+        btnprint.setVisible(true);
+        double total6 = 0.0;
+        for(int i = 0; i < message.length;i++ ){
+            System.out.println("Purchase ID: " + message[i][0] + "   Product ID: " + message[i][1] + "   Customer ID: " + message[i][2] + "   Quantity: " + message[i][3] + "   Tax: " + message[i][4] + "   Total: " + message[i][5]);
+            total6 += Double.parseDouble(message[i][5].toString());
+        }
+        System.out.println("Total Revenue Collected: " + total6);
         //System.out.println("Message: " + message);
         //close resources
         ois.close();
